@@ -179,65 +179,51 @@ export function RegistroVisitantes() {
     }
   }
 
-  const onSubmit = (data: FormValues) => {
-    // Validar que haya una firma
-    if (!hasFirma) {
-      toast({
-        title: "Error en el formulario",
-        description: "La firma es obligatoria para completar el registro",
-        variant: "destructive",
-      })
-      return
-    }
+  const onSubmit = async (data: FormValues) => {
+    try {
+      console.log('Submitting form data:', {
+        ...data,
+        firma: canvasRef.current?.toDataURL() ? 'Signature present' : 'No signature'
+      });
 
-    // Validar el número de identificación según el tipo
-    if (!validarNumeroIdentificacion(data.numeroIdentificacion, data.tipoIdentificacion)) {
-      toast({
-        title: "Error en el formulario",
-        description: "El número de identificación no es válido para el tipo seleccionado",
-        variant: "destructive",
-      })
-      return
-    }
+      const response = await fetch('/api/visitors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...data,
+          firma: canvasRef.current?.toDataURL(),
+        }),
+      });
 
-    // Obtener la firma como imagen base64
-    const canvas = canvasRef.current
-    let firmaBase64 = ""
-    if (canvas) {
-      firmaBase64 = canvas.toDataURL("image/png")
-      const obtenerPesoImagen = (base64String) => {
-        const base64SinHeader = base64String.split(",")[1] || base64String
-        const sizeInBytes = (base64SinHeader.length * 3) / 4
-        return sizeInBytes
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server error:', errorData);
+        throw new Error('Error al registrar el visitante');
       }
-      const pesoBytes = obtenerPesoImagen(firmaBase64)
-      const pesoKB = (pesoBytes / 1024).toFixed(2)
 
-      console.log(`Peso de la imagen: ${pesoBytes} bytes (${pesoKB} KB)`)
+      const result = await response.json();
+      console.log('Registration successful:', result);
+      
+      toast({
+        title: "Registro exitoso",
+        description: "El visitante ha sido registrado correctamente",
+      });
+
+      // Reset form and canvas
+      reset();
+      clearCanvas();
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Hubo un error al registrar el visitante. Por favor, intente nuevamente.",
+      });
     }
-
-    // Aquí se procesaría el envío de datos (en el futuro a Firebase)
-    console.log({ ...data, firma: firmaBase64 })
-
-    // Mostrar mensaje de éxito
-    toast({
-      title: "Registro exitoso",
-      description: "El visitante ha sido registrado correctamente",
-    })
-
-    // Resetear el formulario y la firma
-    reset()
-    clearCanvas()
-    setSubmitted(true)
-
-    // Actualizar la fecha y hora
-    setValue("fechaHoraIngreso", new Date().toISOString())
-
-    // Después de 3 segundos, ocultar el mensaje de éxito
-    setTimeout(() => {
-      setSubmitted(false)
-    }, 3000)
-  }
+  };
 
   return (
     <>
