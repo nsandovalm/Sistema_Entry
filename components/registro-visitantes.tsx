@@ -160,6 +160,7 @@ export function RegistroVisitantes() {
 
   // Función para validar el número de identificación según el tipo
   const validarNumeroIdentificacion = (numero: string, tipo: string) => {
+    if (tipo === "sin_documento") return true
     if (!numero) return false
 
     switch (tipo) {
@@ -173,7 +174,7 @@ export function RegistroVisitantes() {
         // Validación para pasaporte (alfanumérico, entre 6 y 12 caracteres)
         return /^[A-Z0-9]{6,12}$/.test(numero)
       default:
-        // Para "otro", al menos 4 caracteres
+        // Para otros tipos, al menos 4 caracteres
         return numero.length >= 4
     }
   }
@@ -196,7 +197,7 @@ export function RegistroVisitantes() {
         description: "El número de identificación no es válido para el tipo seleccionado",
         variant: "destructive",
       })
-      return 
+      return
     }
 
     // Obtener la firma como imagen base64
@@ -205,17 +206,15 @@ export function RegistroVisitantes() {
     if (canvas) {
       firmaBase64 = canvas.toDataURL("image/png")
       const obtenerPesoImagen = (base64String) => {
-        let base64SinHeader = base64String.split(',')[1] || base64String;
-        let sizeInBytes = (base64SinHeader.length * 3) / 4;
-        return sizeInBytes; 
-      };
-      const pesoBytes = obtenerPesoImagen(firmaBase64);
-      const pesoKB = (pesoBytes / 1024).toFixed(2); 
+        const base64SinHeader = base64String.split(",")[1] || base64String
+        const sizeInBytes = (base64SinHeader.length * 3) / 4
+        return sizeInBytes
+      }
+      const pesoBytes = obtenerPesoImagen(firmaBase64)
+      const pesoKB = (pesoBytes / 1024).toFixed(2)
 
-      console.log(`Peso de la imagen: ${pesoBytes} bytes (${pesoKB} KB)`); 
-
+      console.log(`Peso de la imagen: ${pesoBytes} bytes (${pesoKB} KB)`)
     }
-
 
     // Aquí se procesaría el envío de datos (en el futuro a Firebase)
     console.log({ ...data, firma: firmaBase64 })
@@ -238,19 +237,6 @@ export function RegistroVisitantes() {
     setTimeout(() => {
       setSubmitted(false)
     }, 3000)
-  }
-
-  // Formatear la fecha para mostrarla en el formulario
-  const formatearFecha = (fechaISO: string) => {
-    const fecha = new Date(fechaISO)
-    return fecha.toLocaleString("es-CR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    })
   }
 
   return (
@@ -286,6 +272,9 @@ export function RegistroVisitantes() {
                   onValueChange={(value) => {
                     setValue("tipoIdentificacion", value)
                     setTipoId(value)
+                    if (value === "sin_documento") {
+                      setValue("numeroIdentificacion", "0")
+                    }
                   }}
                   defaultValue=""
                 >
@@ -296,7 +285,7 @@ export function RegistroVisitantes() {
                     <SelectItem value="cedula">Cédula Nacional</SelectItem>
                     <SelectItem value="dimex">DIMEX</SelectItem>
                     <SelectItem value="pasaporte">Pasaporte</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
+                    <SelectItem value="sin_documento">Sin Documento</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.tipoIdentificacion && (
@@ -305,39 +294,59 @@ export function RegistroVisitantes() {
               </div>
 
               {/* Número de Identificación */}
-              <div className="space-y-2">
-                <Label htmlFor="numeroIdentificacion" className="font-medium">
-                  Número de Identificación <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="numeroIdentificacion"
-                  placeholder={
-                    tipoId === "cedula"
-                      ? "Ingrese 9 dígitos"
-                      : tipoId === "dimex"
-                        ? "Ingrese 11-12 dígitos"
-                        : tipoId === "pasaporte"
-                          ? "Alfanumérico (6-12 caracteres)"
-                          : "Ingrese su número de identificación"
-                  }
-                  {...register("numeroIdentificacion")}
-                  className={errors.numeroIdentificacion ? "border-red-500" : ""}
-                />
-                {errors.numeroIdentificacion && (
-                  <p className="text-sm text-red-500">{errors.numeroIdentificacion.message}</p>
-                )}
-                {tipoId && (
-                  <p className="text-xs text-gray-500">
-                    {tipoId === "cedula"
-                      ? "Formato: 9 dígitos numéricos"
-                      : tipoId === "dimex"
-                        ? "Formato: 11 o 12 dígitos numéricos"
-                        : tipoId === "pasaporte"
-                          ? "Formato: Entre 6 y 12 caracteres alfanuméricos"
-                          : "Mínimo 4 caracteres"}
-                  </p>
-                )}
-              </div>
+              {tipoId !== "sin_documento" && (
+                <div className="space-y-2">
+                  <Label htmlFor="numeroIdentificacion" className="font-medium">
+                    Número de Identificación <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="numeroIdentificacion"
+                    placeholder={
+                      tipoId === "cedula"
+                        ? "Ingrese 9 dígitos"
+                        : tipoId === "dimex"
+                          ? "Ingrese 11-12 dígitos"
+                          : tipoId === "pasaporte"
+                            ? "Alfanumérico (6-12 caracteres)"
+                            : "Ingrese su número de identificación"
+                    }
+                    {...register("numeroIdentificacion")}
+                    className={errors.numeroIdentificacion ? "border-red-500" : ""}
+                    onKeyDown={(e) => {
+                      // Permitir solo números para cédula y DIMEX
+                      if (tipoId === "cedula" || tipoId === "dimex") {
+                        const isNumber = /[0-9]/.test(e.key)
+                        const isControlKey = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)
+                        if (!isNumber && !isControlKey) {
+                          e.preventDefault()
+                        }
+                      }
+                      // Permitir solo alfanuméricos para pasaporte (no caracteres especiales)
+                      else if (tipoId === "pasaporte") {
+                        const isAlphaNumeric = /[a-zA-Z0-9]/.test(e.key)
+                        const isControlKey = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)
+                        if (!isAlphaNumeric && !isControlKey) {
+                          e.preventDefault()
+                        }
+                      }
+                    }}
+                  />
+                  {errors.numeroIdentificacion && (
+                    <p className="text-sm text-red-500">{errors.numeroIdentificacion.message}</p>
+                  )}
+                  {tipoId && (
+                    <p className="text-xs text-gray-500">
+                      {tipoId === "cedula"
+                        ? "Formato: 9 dígitos numéricos"
+                        : tipoId === "dimex"
+                          ? "Formato: 11 o 12 dígitos numéricos"
+                          : tipoId === "pasaporte"
+                            ? "Formato: Entre 6 y 12 caracteres alfanuméricos"
+                            : "Mínimo 4 caracteres"}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Motivo de la Visita */}
               <div className="space-y-2">
@@ -349,27 +358,41 @@ export function RegistroVisitantes() {
                     <SelectValue placeholder="Seleccione motivo de visita" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="padre_madre">Padre/Madre</SelectItem>
-                    <SelectItem value="encargado_legal">Encargado Legal</SelectItem>
-                    <SelectItem value="proveedor">Proveedor</SelectItem>
-                    <SelectItem value="inspector_mep">Inspector MEP</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
+                    <SelectItem value="direccion">Dirección</SelectItem>
+                    <SelectItem value="reunion_docente">Reunión con Docente</SelectItem>
+                    <SelectItem value="reunion_general">Reunión General</SelectItem>
+                    <SelectItem value="reunion_grupo">Reunión Específica Grupo</SelectItem>
+                    <SelectItem value="reunion_mep">Reunión Funcionario MEP</SelectItem>
+                    <SelectItem value="otros">Otros</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.motivoVisita && <p className="text-sm text-red-500">{errors.motivoVisita.message}</p>}
               </div>
 
               {/* Fecha y Hora de Ingreso */}
-              <div className="space-y-2">
-                <Label htmlFor="fechaHoraIngreso" className="font-medium">
-                  Fecha y Hora de Ingreso
-                </Label>
-                <Input
-                  id="fechaHoraIngreso"
-                  value={formatearFecha(new Date().toISOString())}
-                  disabled
-                  className="bg-gray-50"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fechaIngreso" className="font-medium">
+                    Fecha de Ingreso
+                  </Label>
+                  <Input
+                    id="fechaIngreso"
+                    value={new Date().toLocaleDateString("es-CR")}
+                    disabled
+                    className="bg-gray-50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="horaIngreso" className="font-medium">
+                    Hora de Ingreso
+                  </Label>
+                  <Input
+                    id="horaIngreso"
+                    value={new Date().toLocaleTimeString("es-CR")}
+                    disabled
+                    className="bg-gray-50"
+                  />
+                </div>
               </div>
 
               {/* Firma Digital */}
